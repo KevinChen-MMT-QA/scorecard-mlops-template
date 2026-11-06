@@ -1,0 +1,362 @@
+# 产业金融营销优先级评分卡 - 场景配置
+# 表结构变更时，只需同步修改本目录下的 fields.csv 与 source 配置
+#
+# 配置块说明（按需精简）：
+#   scenario                    —— 场景标识，与目录名保持一致
+#   source / data / model / sql —— 必填，删除或缺省会导致启动失败
+#   fields_file                 —— 必填，字段清单 csv 路径（相对本文件目录）
+#   preprocessing               —— 可选，整块删除则使用代码内置默认值
+#   rules                       —— 业务规则：否决（E 等级）与加分，可选
+#   mock                        —— 仅 load_mode=mock 时使用，生产可整块删除
+# 本文件由统一入口 run.py 加载；相对路径均以本文件所在目录为基准
+# 主键、样本表头、SQL 输出均固定为 unt_scl_cdt_cd
+scenario: industry_finance
+version: 1  # 配置版本号，仅用于标识，代码不做校验
+fields_file: fields.csv  # 字段清单：name,cn_name,data_type,feature_type（仅入模候选字段）
+source:
+  database: mdm_m01      # Hive 库名；留空则 SQL 直接使用 table_name，不拼接库名
+  table_name: m01_100_mkt_icf_cust_info    # Hive 特征源表名；生产必须改为真实表名
+  primary_key: unt_scl_cdt_cd   # 唯一主键：固定为该值，且不得出现在字段清单中
+  partition_field: part_dt      # 分区字段；SQL 按 part_dt='${bizdate}' 取当日快照
+  partition_value: ${bizdate}   # SQL 分区变量占位符，由 Hive -hivevar bizdate=... 传入
+  # 分区日期即快照日期：part_dt='${bizdate}' 当天即为最新快照，不再单独维护快照日期字段
+# 特征衍生：可选块；配置后训练端（Spark）和 SQL 产物端共用同一份 SQL
+# 衍生字段需同步追加到 fields.csv 作为入模候选（或规则引用）
+feature_engineering:
+  enabled: true
+  sql_file: feature_engineering.sql   # 特征衍生 SQL 文件（相对场景目录）
+data:
+  # 数据来源：mock=离线测试，按人工打标样本逐行生成特征；spark=生产，从 Hive 读特征后按打标主键过滤
+  load_mode: mock
+  # 打标样本格式：csv=必须含表头；txt=一行一个主键（无表头，首行主键名自动跳过，空白行忽略）
+  sample_format: csv
+  pos_sample_csv: samples/pos_sample_ids.csv   # 正样本人工打标结果，主键列 unt_scl_cdt_cd
+  neg_sample_csv: samples/neg_sample_ids.csv   # 负样本人工打标结果，主键列 unt_scl_cdt_cd
+  train_ratio: 0.7                     # 训练集比例，按标签分层切分，其余为测试集
+  split_seed: 42                       # 切分哈希种子；同种子 + 同主键可复现切分结果
+  spark:                               # 仅 load_mode=spark 使用，mock 模式可整块删除
+    app_name: scorecard_feature_load   # Spark 应用名，便于 YARN 上定位任务
+    bizdate: ${bizdate}                # 兜底分区日期；生产建议用命令行参数，不依赖此项
+# 可选块：整块删除时，代码使用下列默认值（数值与当前配置一致）
+preprocessing:
+  missing_rate_threshold: 0.9      # 训练集缺失率超过该值的字段直接剔除
+  numeric:                         # 数值型字段分箱参数
+    max_initial_bins: 20           # 初始等频分箱的箱数上限
+    max_bin: 8                     # 卡方合并后保留的最大箱数
+    min_bin_pct: 0.03              # 每箱最小样本占比，低于该值的箱会被合并
+  category:                        # 类别型字段参数
+    max_cardinality: 50            # 类别基数上限，超过则整个字段剔除（如省/市/区县）
+  flag:                            # 0/1 标志位参数
+    valid_values:                  # 仅这些取值有效，其余一律视为缺失
+    - '0'
+    - '1'
+# 必填块：可写为 model: {} 使用全部默认值
+model:
+  iv_threshold: 0.01     # IV 低于该值的字段剔除（0.01 为弱特征门槛）
+  vif_threshold: 5.0     # VIF 超过该值时，逐步剔除共线性最强的字段
+  l1_C: 1.0              # L1 正则强度；越小越稀疏，越容易把系数压为 0
+  max_iter: 1000         # 逻辑回归最大迭代次数
+  random_state: 42       # 随机种子，保证训练结果可复现
+  base_score: 100        # 基准分：评分卡的基础分值
+  pdo: 10                # PDO：好坏比翻倍时分数变化的跨度（点倍率）
+  score_decimals: 2      # SQL 输出分数保留的小数位
+# 必填块：可写为 sql: {} 使用全部默认值
+sql:
+  output_file: report/scorecard.sql   # 评分卡 SQL 的落盘路径（相对本场景目录）
+  report_dir: report                  # 评估 CSV / Markdown 报告目录（相对本场景目录）
+  score_alias: score                  # 输出分数字段名
+  level_alias: customer_level         # 输出等级字段名（A/B/C/D/E）
+# 业务规则：先判否决（任一否决条件命中 → E），再算基础分并负分归零，最后加分
+rules:
+  veto:
+    enabled: true                 # 是否启用否决规则
+    level: E                      # 命中后的客户等级
+    exclude_from_train: true      # 命中客户是否从训练集中剔除（测试集保留，用于评估）
+    mock_hit_rate: 0.02           # 仅 mock 模式：每个否决条件的命中概率，便于本地验证
+    # 任一条件命中即一票否决；!= 条件在字段缺失时也视为命中
+    any:
+    - {field: check_class_cd, op: "=", value: "0"}    # 考核分类=风险客户
+    - {field: reg_st, op: "!=", value: "正常"}         # 经营异常：登记状态非正常（缺失也命中）
+    - {field: wht_disc_exec, op: "=", value: "1"}      # 失信被执行
+    - {field: wht_rel_disc_exec, op: "=", value: "1"}  # 关联失信被执行
+    - {field: wht_ser_ileg, op: "=", value: "1"}       # 工商严重违法
+    - {field: wht_bond_warn, op: "=", value: "1"}      # 债券预警名单内企业
+    - {field: wht_ser_risk, op: "=", value: "1"}       # 严重风险预警
+    - {field: wht_risk_list, op: "=", value: "1"}      # 两级三层名单
+    - {field: wht_aml_list, op: "=", value: "1"}       # 反洗钱名单
+  bonus:
+    enabled: true                 # 是否启用加分规则
+    max_total: 20                 # 各类加分合计上限（分值），超过则按 20 封顶
+    # 本版按“每项统一 5 分”落地；原业务建议权重：0.2→20 分、0.1→10 分、0.05→5 分
+    score_rules:                  # 分值类加分：基础分负分归零后先加
+    - name: "股权链客户：属于我行股权链客户体系，关系可追溯、营销协同性强"
+      all:
+      - {field: wht_eqt_chain, op: "=", value: "1"}
+      points: 5
+    - name: "重点产业客户：纳入重点产业客户库，属于产业金融重点投向"
+      all:
+      - {field: wht_key_ind_cust, op: "=", value: "1"}
+      points: 5
+    - name: "企业规模中型及以上：规模达到中型或大型，承贷与综合贡献能力较强"
+      any:                        # any 表示满足任一条件即可
+      - {field: entp_scl, op: "=", value: 中型}
+      - {field: entp_scl, op: "=", value: 大型}
+      points: 5
+    - name: "央国企：中央或地方国有企业，信用资质与稳定性较好"
+      all:
+      - {field: wht_soe, op: "=", value: "1"}
+      points: 5
+    - name: "上市公司：已上市公司，信息披露充分、经营透明度高"
+      all:
+      - {field: wht_lstd_co, op: "=", value: "1"}
+      points: 5
+    - name: "拟上市公司：进入拟上市名单，成长性与规范度较高"
+      all:
+      - {field: wht_prep_list, op: "=", value: "1"}
+      points: 5
+    - name: "技术流评级TB及以上：技术流评级达到TB及以上，科技属性与创新能力较强"
+      any:
+      - {field: rt_rslt_idx, op: "=", value: "1"}
+      - {field: rt_rslt_idx, op: "=", value: "2"}
+      points: 5
+    - name: "成立年限5年以上：成立满5年，经营历史与稳定性达到基础门槛"
+      all:
+      - {field: entp_setup_yr, op: ">", value: 5}
+      points: 5
+    - name: "成立年限10年以上：成立满10年，经营沉淀更深、抗风险能力更强"
+      all:
+      - {field: entp_setup_yr, op: ">", value: 10}
+      points: 5
+    - name: "总分行重点目标客户：列入总行或分行重点营销目标，属于主动营销对象"
+      all:
+      - {field: key_cust_ind, op: "=", value: "1"}
+      points: 5
+    - name: "合作紧密度-重点产业客户：合作紧密度维度再次强调重点产业客户，与重点产业客户规则叠加"
+      all:
+      - {field: wht_key_ind_cust, op: "=", value: "1"}
+      points: 5
+    percent_rules: []             # 百分比类加分：在分值类加分后叠加，可配置多项
+    # 百分比类示例（percent 基数为“负分归零 + 分值类加分”）：
+    # - name: 高成长企业
+    #   all:
+    #   - {field: rev_growth_rt, op: ">", value: 0.2}
+    #   percent: 0.03
+# 离线 mock 专用块：仅 load_mode=mock 生效，生产切 spark 后可整块删除
+# 注意：mock 模式下删除本块会失去演示信号（数据随机，可能因 IV 不足导致训练失败）
+mock:
+  random_state: 42             # mock 随机种子，固定后每次生成的数据一致
+  default_missing_rate: 0.08   # 未在 missing_rates 中列出的字段的默认缺失率
+  missing_rates:               # 按字段指定缺失率（rev_cls_num 故意设 0.88，演示高缺失剔除）
+    rev_cls_num: 0.88
+    rev_growth_rt: 0.6
+    sl_nt_prft_rt: 0.6
+    sl_pm_rt: 0.55
+    ast_lia_rt: 0.55
+    pft_tot: 0.45
+    nt_pft: 0.45
+    lia_tot: 0.4
+    aset_tot: 0.35
+    biz_tot_incm: 0.3
+    reg_cap_val: 0.2
+    entp_setup_yr: 0.12
+    rtl_shh_rntp_rlt_cib_num_cust: 0.25
+    otwrd_invst_rntp_rlt_cib_num_cust: 0.25
+    supp_chn_core_cust_cnt: 0.3
+    fund_chn_rel_cust_cnt: 0.3
+  default_category_values:     # 未在 category_values 中列出的类别字段，从这里随机取值
+  - A
+  - B
+  - C
+  - D
+  category_values:             # 按字段指定类别取值池（字段名必须存在于 fields.csv）
+    chain_code:
+    - '01'
+    - '02'
+    - '03'
+    - '04'
+    - '05'
+    reg_st:                      # 仅用于否决规则 mock：非“正常”的取值池
+    - 存续
+    - 在业
+    - 吊销
+    - 注销
+    entp_st:
+    - 国有企业
+    - 民营企业
+    - 外资企业
+    - 集体企业
+    wht_soe:
+    - '1'
+    - '0'
+    cr_num:
+    - 100人以下
+    - 100-500人
+    - 500-1000人
+    - 1000人以上
+    ipo_progress:
+    - 未启动
+    - 辅导期
+    - 已申报
+    - 已上市
+    above_scale_type:
+    - 大型
+    - 中型
+    - 小型
+  signal_flags:                # 标志位演示信号：坏样本取 1 的概率 bad_p，好样本取 1 的概率 good_p
+  - field: wht_key_ind_cust
+    bad_p: 0.15
+    good_p: 0.4
+  - field: wht_cib_chn
+    bad_p: 0.2
+    good_p: 0.45
+  - field: wht_above_scale
+    bad_p: 0.25
+    good_p: 0.55
+  - field: nation_innov_demo_ent_ind
+    bad_p: 0.06
+    good_p: 0.18
+  - field: nation_new_tech_ent_ind
+    bad_p: 0.1
+    good_p: 0.3
+  - field: prov_srdi_mid_sml_ent_ind
+    bad_p: 0.12
+    good_p: 0.32
+  - field: st_mid_sml_ent_ind
+    bad_p: 0.1
+    good_p: 0.28
+  - field: wht_hard_tech
+    bad_p: 0.15
+    good_p: 0.3
+  - field: wht_major_tender
+    bad_p: 0.1
+    good_p: 0.25
+  - field: wht_qk_top30_inv
+    bad_p: 0.08
+    good_p: 0.2
+  - field: wht_pe_inv_gt5m
+    bad_p: 0.1
+    good_p: 0.22
+  - field: wht_mna
+    bad_p: 0.12
+    good_p: 0.25
+  - field: wht_lstd_co
+    bad_p: 0.08
+    good_p: 0.2
+  signal_numeric:              # 数值型演示分布：dist=normal/lognormal/poisson，bad_*/good_* 为好坏样本参数
+  - field: entp_setup_yr
+    dist: normal
+    bad_mu: 6.0
+    good_mu: 14.0
+    sigma: 4.0
+    min: 0
+  - field: reg_cap_val
+    dist: lognormal
+    bad_median: 5000000.0
+    good_median: 20000000.0
+    sigma_log: 1.1
+    min: 0
+  - field: biz_tot_incm
+    dist: lognormal
+    bad_median: 8000000.0
+    good_median: 50000000.0
+    sigma_log: 1.2
+    min: 0
+  - field: ast_lia_rt
+    dist: normal
+    bad_mu: 0.78
+    good_mu: 0.55
+    sigma: 0.12
+    min: 0
+    max: 3
+  - field: rev_growth_rt
+    dist: normal
+    bad_mu: -0.06
+    good_mu: 0.1
+    sigma: 0.1
+    min: -1
+    max: 1
+  - field: sl_nt_prft_rt
+    dist: normal
+    bad_mu: 0.02
+    good_mu: 0.09
+    sigma: 0.04
+    min: -1
+    max: 1
+  - field: nt_pft
+    dist: lognormal
+    bad_median: 500.0
+    good_median: 2000.0
+    sigma_log: 1.2
+    min: 0
+  - field: rtl_shh_rntp_rlt_cib_num_cust
+    dist: poisson
+    bad_lambda: 2.0
+    good_lambda: 6.0
+  - field: fund_chn_rel_cust_cnt
+    dist: poisson
+    bad_lambda: 2.0
+    good_lambda: 4.0
+  signal_category:             # 类别型演示分布：values 与 bad_probs/good_probs 逐项对应
+  - field: industry_code
+    values:
+    - C13
+    - C26
+    - C39
+    - F51
+    - I65
+    - L72
+    bad_probs:
+    - 0.35
+    - 0.08
+    - 0.12
+    - 0.25
+    - 0.05
+    - 0.15
+    good_probs:
+    - 0.08
+    - 0.18
+    - 0.14
+    - 0.14
+    - 0.28
+    - 0.18
+  - field: entp_scl
+    values:
+    - 大型
+    - 中型
+    - 小型
+    - 微型
+    bad_probs:
+    - 0.1
+    - 0.25
+    - 0.45
+    - 0.2
+    good_probs:
+    - 0.25
+    - 0.4
+    - 0.28
+    - 0.07
+  - field: rt_rslt_id
+    values:
+    - TA1
+    - TA2
+    - TA3
+    - TB1
+    - TB2
+    - TC
+    - TD
+    bad_probs:
+    - 0.08
+    - 0.12
+    - 0.15
+    - 0.20
+    - 0.20
+    - 0.15
+    - 0.10
+    good_probs:
+    - 0.25
+    - 0.30
+    - 0.20
+    - 0.15
+    - 0.05
+    - 0.03
+    - 0.02

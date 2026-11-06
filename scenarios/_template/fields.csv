@@ -1,0 +1,3 @@
+name,cn_name,data_type,feature_type
+example_amt,示例金额,decimal,numeric
+example_flag,示例标志,varchar,flag

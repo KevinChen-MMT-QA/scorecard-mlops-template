@@ -1,0 +1,88 @@
+# 评分卡场景配置模板
+# 由 python run.py init --scenario <name> 复制生成，请按实际业务修改以下内容：
+#   1. source.database / table_name：真实 Hive 库表
+#   2. fields.csv：真实候选字段清单
+#   3. samples/pos_sample_ids.csv、samples/neg_sample_ids.csv：人工打标主键
+#   4. data.load_mode：本地调试 mock，生产 spark
+#   5. rules：否决与加分规则（可选）
+scenario: __SCENARIO__
+version: 1
+fields_file: fields.csv
+
+source:
+  database: __DATABASE__          # Hive 库名；留空则 SQL 直接使用 table_name
+  table_name: __TABLE_NAME__      # Hive 源表名
+  primary_key: unt_scl_cdt_cd     # 固定主键，不得出现在字段清单中
+  partition_field: part_dt        # 分区字段
+  partition_value: ${bizdate}     # Hive 变量占位符
+
+data:
+  load_mode: mock                 # mock=本地演示，spark=生产取数
+  sample_format: csv              # csv=含表头；txt=一行一个主键、无表头
+  pos_sample_csv: samples/pos_sample_ids.csv
+  neg_sample_csv: samples/neg_sample_ids.csv
+  train_ratio: 0.7
+  split_seed: 42
+  spark:
+    app_name: __SCENARIO___scorecard
+    bizdate: ${bizdate}
+
+preprocessing:
+  missing_rate_threshold: 0.9
+  numeric:
+    max_initial_bins: 20
+    max_bin: 8
+    min_bin_pct: 0.03
+  category:
+    max_cardinality: 50
+  flag:
+    valid_values:
+    - '0'
+    - '1'
+
+model:
+  iv_threshold: 0.01
+  vif_threshold: 5.0
+  l1_C: 1.0
+  max_iter: 1000
+  random_state: 42
+  base_score: 100
+  pdo: 10
+  score_decimals: 2
+
+sql:
+  output_file: report/scorecard.sql
+  report_dir: report
+  score_alias: score
+  level_alias: customer_level
+
+rules:
+  veto:
+    enabled: false
+  bonus:
+    enabled: false
+    max_total: 20
+    score_rules: []
+    percent_rules: []
+
+mock:
+  random_state: 42
+  default_missing_rate: 0.05
+  missing_rates:
+    example_amt: 0.2
+  default_category_values:
+  - A
+  - B
+  - C
+  - D
+  signal_flags:
+  - field: example_flag
+    bad_p: 0.2
+    good_p: 0.5
+  signal_numeric:
+  - field: example_amt
+    dist: normal
+    bad_mu: 100
+    good_mu: 300
+    sigma: 50
+    min: 0

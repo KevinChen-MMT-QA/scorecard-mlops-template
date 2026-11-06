@@ -1,0 +1,107 @@
+字段名	字段中文名	字段类型	长度	精度
+data_dt	数据日期	date		
+wht_disc_exec	是否失信被执行	varchar	1	
+wht_rel_disc_exec	是否关联失信被执行	varchar	1	
+wht_ser_ileg	是否工商严重违法	varchar	1	
+wht_bond_warn	是否债券预警名单内企业	varchar	1	
+wht_ser_risk	是否严重风险预警	varchar	1	
+wht_risk_list	是否两级三层名单	varchar	1	
+wht_aml_list	是否反洗钱名单	varchar	1	
+wht_pre_credit	是否主动预授信客户	varchar	1	
+wht_rel_cust	是否谱系客户	varchar	1	
+wht_eqt_chain	是否股权链	varchar	1	
+wht_fund_chain	是否资金链	varchar	1	
+wht_supp_chain	是否供应链	varchar	1	
+wht_key_ind_cust	是否重点产业客户库	varchar	1	
+ins_cust_ind	行内外客户标识	varchar	1	
+credit_cust_ind	授信客户标识	varchar	1	
+ecif_cust_code	客户编号	varchar	12	
+core_cust_code	核心客户号	varchar	10	
+cust_nm	企业名称	varchar	360	
+unt_scl_cdt_cd	统一社会信用代码	varchar	18	
+check_class_cd	客户考核分类	varchar	8	
+belong_org_id	主办分行编号	varchar	7	
+hst_br_nm	主办分行名称	varchar	360	
+attrib_addr_br_nm	属地分行名称	varchar	360	
+reg_st	企业状态	varchar	45	
+entp_st	企业性质	varchar	100	
+pvc	省份	varchar	60	
+city	城市	varchar	48	
+cnty	区县	varchar	48	
+cntct_tel	电话	varchar	150	
+cntct_email	邮箱	varchar	150	
+ann_rpt_yr	年报年份	varchar	10	
+wht_soe	是否央国企	varchar	100	
+entp_setup_yr	成立年限	decimal	18	2
+entp_scl	企业规模	varchar	40	
+cr_num	近一年从业人数	varchar	60	
+industry_l1_name	行业大类	varchar	900	
+industry_l2_name	行业中类	varchar	900	
+industry_l3_name	行业小类	varchar	900	
+industry_code	国标行业代码	varchar	10	
+biz_scp	主营业务	varchar	2000	
+reg_cap_ccy	注册资本币种	varchar	50	
+reg_cap_val	注册资本	decimal	18	2
+wht_lstd_co	是否上市公司	varchar	1	
+wht_prep_list	是否拟上市公司	varchar	1	
+nation_innov_demo_ent_ind	国家技术创新示范企业	varchar	1	
+nation_new_tech_ent_ind	国家级高新技术企业	varchar	1	
+manuf_champ_ent_ind	制造业单项冠军企业	varchar	1	
+prov_srdi_mid_sml_ent_ind	专精特新中小企业	varchar	1	
+st_mid_sml_ent_ind	科技型中小企业	varchar	1	
+innov_mid_sml_ent_ind	创新型中小企业	varchar	1	
+wht_hard_tech	是否硬科技赛道	varchar	1	
+wht_above_scale	是否规上企业	varchar	1	
+above_scale_type	规上企业类型	varchar	40	
+wht_cib_chn	是否属于我行产业链	varchar	1	
+chain_code	所属产业链代码	varchar	2	
+key_cust_ind	总分行重点客户代码	varchar	1	
+rt_rslt_id	技术流评级	varchar	4	
+wht_credit_pol_pri	是否授信政策优先支持行业	varchar	1	
+wht_credit_pol_mod	是否授信政策适度支持行业	varchar	1	
+wht_sim_cust_prod	是否已有相似客户业务落地产品	varchar	1	
+wht_sim_bal_gt100b	是否相似客户已落地业务余额超过100亿	varchar	1	
+wht_mkt_access	是否存在营销触达路径	varchar	1	
+mkt_key_psn	营销关键人物	varchar	128	
+mkt_key_ent	营销关键企业	varchar	128	
+rtl_shh_rntp_rlt_cib_num_cust	关联股东企业关联本行客户数	int		
+otwrd_invst_rntp_rlt_cib_num_cust	对外投资企业关联本行客户数	int		
+supp_chn_core_cust_cnt	供应链核心企业关联上下游客户本行客户数	int		
+fund_chn_rel_cust_cnt	资金链关联本行客户数量	int		
+wht_major_tender	存在重大项目招投标信息	varchar	1	
+wht_qk_top30_inv	是否引入清科排名前30投资机构入股（5年内）	varchar	1	
+wht_pe_inv_gt5m	是否引入私募股权投资金额大于500万	varchar	1	
+wht_refinance	是否存在再融资信息	varchar	1	
+wht_mna	是否存在并购信息	varchar	1	
+ipo_progress	IPO进程	varchar	100	
+rev_growth_rt	营业收入增长率	decimal	18	6
+credit_bal_pct	用信余额占比	decimal	18	6
+lmt_amt	授信敞口	decimal	18	2
+in_us_amt	用信余额	decimal	18	2
+dept_bal_avg_y	企金存款余额年日均	decimal	18	2
+undisc_ln_bal	非贴现贷款余额	decimal	18	2
+rpt_src	年报数据来源	varchar	10	
+rpt_prd	报告日期	varchar	10	
+biz_tot_incm	营业总收入	decimal	18	2
+aset_tot	资产总额	decimal	18	2
+lia_tot	负债总额	decimal	18	2
+pft_tot	利润总额	decimal	18	2
+nt_pft	净利润	decimal	18	2
+ast_lia_rt	资产负债率	decimal	18	6
+sl_nt_prft_rt	销售净利率	decimal	18	6
+sl_pm_rt	销售利润率	decimal	18	6
+mkt_key_ent_hst_br_nm	营销关键企业主办分行	varchar	360	
+mkt_key_ent_hst_mgr_id	营销关键企业主办客户经理notesid	varchar	18	
+hst_mgr_fll_nm	主办客户经理	varchar	180	
+atch_grp_cust_nm	归属谱系客户名称	varchar	1536	
+atch_grp_cust_id	归属谱系客户编号	varchar	36	
+manu_idtfy_flg	人工认定标志	varchar	1	
+cust_aggregate_id	客户所属集团编号	varchar	24	
+cust_aggregate_name	客户所属集团名称	varchar	240	
+fnd_dt	成立日期	varchar	20	
+new_reg_entp_ind	是否新注册企业	varchar	1	
+reg_addr	注册地址	varchar	690	
+mkt_crux_chr_typ	营销关键人物类型	varchar	64	
+mkt_crux_entp_typ	营销关键企业类型	varchar	64	
+hst_mgr_id	主办客户经理编号	varchar	9	
+part_dt	分区日期	string

@@ -1,0 +1,28 @@
+# ===== Python =====
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# ===== IDE =====
+.vscode/
+.trae/
+.idea/
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+
+# ===== 训练产物（每次 run.py pipeline 重新生成，不入库）=====
+scenarios/*/report/abcd_rule.csv
+scenarios/*/report/eval_result.csv
+scenarios/*/report/feature_quality.csv
+scenarios/*/report/model_report.md
+scenarios/*/report/score_detail.csv
+scenarios/*/report/scorecard.sql
+scenarios/*/report/scaler.pkl
+scenarios/*/report/rules.json
+
+# ===== 日志 =====
+*.log
